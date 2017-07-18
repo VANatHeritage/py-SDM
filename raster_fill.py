@@ -65,33 +65,33 @@ r1 = arcpy.Resample_management(lyr, wd + "r1.tif", str(cellsize), "BILINEAR")
 r2 = arcpy.Clip_management(r1, "#", wd + "r2.tif", clip, "#", "ClippingGeometry")
 
 if not recursive:
-	# check out Spatial Analyst for EucDistance
-	arcpy.CheckOutExtension("Spatial")
+   # check out Spatial Analyst for EucDistance
+   arcpy.CheckOutExtension("Spatial")
 
-	# retrieve maximum distance of nodata value to real values
-	# for conditionally filling nodata values with mean of circular neighborhood (with radius mx)
-	ed1 = EucDistance(r2)
-	ed2 = ExtractByMask(ed1, template)
-	maxd = arcpy.GetRasterProperties_management(ed2, "MAXIMUM")
-	mx = maxd.getOutput(0) + 90
-	# the +90 ensures that all pixels should get more than one pixel of real data in their focal window
-	print 'Radius size: ' + str(mx) + ' m'
+   # retrieve maximum distance of nodata value to real values
+   # for conditionally filling nodata values with mean of circular neighborhood (with radius mx)
+   ed1 = EucDistance(r2)
+   ed2 = ExtractByMask(ed1, template)
+   maxd = arcpy.GetRasterProperties_management(ed2, "MAXIMUM")
+   mx = maxd.getOutput(0) + 90
+   # the +90 ensures that all pixels should get more than one pixel of real data in their focal window
+   print 'Radius size: ' + str(mx) + ' m'
 
-	# this would fill in nodata cells the mean in a focal neighborhood with a radius equal to the max distance from 
-	# a nodata cell to a real value. It's very slow with large radius values (e.g, 5 km+)
-	r3 = Con(IsNull(r2),FocalStatistics(r2, NbrCircle(mx, 'MAP'),typ), r2)
-	r3 = ExtractByMask(r3, template)
-	r3.save(out_file)
+   # this would fill in nodata cells the mean in a focal neighborhood with a radius equal to the max distance from 
+   # a nodata cell to a real value. It's very slow with large radius values (e.g, 5 km+)
+   r3 = Con(IsNull(r2),FocalStatistics(r2, NbrCircle(mx, 'MAP'),typ), r2)
+   r3 = ExtractByMask(r3, template)
+   r3.save(out_file)
 
 else:
-	# this loop recursively fills nodata cells within 1km until the number of nodata cells matches the template dataset
-	while ndfinal != ndtempl:
-		r2 = Con(IsNull(r2),FocalStatistics(r2, NbrCircle(1000, 'MAP'),typ), r2)
-		r2 = ExtractByMask(r2, template)
-		npArray = arcpy.RasterToNumPyArray(r2,"","","",-9999)
-		ndfinal = len(ma.masked_where(npArray <> -9999, npArray).compressed())
-		print ndfinal
-		print ndtempl
+   # this loop recursively fills nodata cells within 1km until the number of nodata cells matches the template dataset
+   while ndfinal != ndtempl:
+      r2 = Con(IsNull(r2),FocalStatistics(r2, NbrCircle(1000, 'MAP'),typ), r2)
+      r2 = ExtractByMask(r2, template)
+      npArray = arcpy.RasterToNumPyArray(r2,"","","",-9999)
+      ndfinal = len(ma.masked_where(npArray <> -9999, npArray).compressed())
+      print ndfinal
+      print ndtempl
 
-	## DON'T FORGET TO SAVE!!
-	r2.save(out_file)
+   ## DON'T FORGET TO SAVE!!
+   r2.save(out_file)
