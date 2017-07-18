@@ -73,7 +73,7 @@ if not recursive:
    ed1 = EucDistance(r2)
    ed2 = ExtractByMask(ed1, template)
    maxd = arcpy.GetRasterProperties_management(ed2, "MAXIMUM")
-   mx = maxd.getOutput(0) + 90
+   mx = float(maxd.getOutput(0)) + 90
    # the +90 ensures that all pixels should get more than one pixel of real data in their focal window
    print 'Radius size: ' + str(mx) + ' m'
 
