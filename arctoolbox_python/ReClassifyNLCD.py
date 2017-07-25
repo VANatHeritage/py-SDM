@@ -75,17 +75,19 @@ outsetNull.save(output_raster)
 in_nlcd_class="nlcd_classified_clean"
 
 # impervious
-output_raster="nlcd_impervious_clean"
-outsetNull=ExtractByMask(impervious_raster,in_nlcd_class)
-outsetNull=SetNull(outsetNull,outsetNull,"Value = 127")
-outsetNull.save(output_raster)
-in_impervious="nlcd_impervious_clean"
+if impervious_raster:
+   output_raster="nlcd_impervious_clean"
+   outsetNull=ExtractByMask(impervious_raster,in_nlcd_class)
+   outsetNull=SetNull(outsetNull,outsetNull,"Value = 127")
+   outsetNull.save(output_raster)
+   in_impervious="nlcd_impervious_clean"
 
 # canopy
-output_raster="nlcd_canopy_clean"
-outsetNull=ExtractByMask(canopy_raster,in_nlcd_class)
-outsetNull.save(output_raster)
-in_canopy="nlcd_canopy_clean"
+if canopy_raster:
+   output_raster="nlcd_canopy_clean"
+   outsetNull=ExtractByMask(canopy_raster,in_nlcd_class)
+   outsetNull.save(output_raster)
+   in_canopy="nlcd_canopy_clean"
 
 
 ##Step 0: Set up the Remap Values
@@ -169,8 +171,10 @@ print "done reclassifying"
 
 # get list of binary rasters and add impervious and canopy to it
 proj_source=arcpy.ListRasters(project_nm  + "_b_*")
-proj_source.append(in_impervious)
-proj_source.append(in_canopy)
+if impervious_raster:
+   proj_source.append(in_impervious)
+if canopy_raster:
+   proj_source.append(in_canopy)
 
 neighborhood_1=NbrRectangle(3,3,"CELL")
 neighborhood_10=NbrCircle(10,"CELL")
