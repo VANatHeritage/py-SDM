@@ -2,7 +2,7 @@
 # raster_fill.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-07-18
-# Last Edit: 2017-07-18
+# Last Edit: 2017-07-25
 # Creator(s): David Bucklin
 
 # Summary:
@@ -26,24 +26,29 @@ import numpy.ma as ma
 from arcpy import env
 from arcpy.sa import *
 
-# options
-# focal stats fill type? ('MEAN','MAJORITY','MEDIAN')
-typ = 'MEAN'
-# run recursively (1km fill at a time) or with one focal stats (with minimum necessary radius to fill all nodata)
-recursive = False
-
 # set paths
 # output file
-out_file = 'E:/arcmap_wd/VA_SDM_SSURGO/ssurgoClay_fullrad.tif'
+out_file = arcpy.GetParameterAsText(0)
 # scratch working dir
-wd = 'E:/arcmap_wd/scratch_folder/'
+wd = arcpy.GetParameterAsText(1)
 # initial raster file, with nodata gaps to fill
-lyr = 'E:/r_wd/ssurgo_clay.tif'
+lyr = arcpy.GetParameterAsText(2)
 # a template raster file, to mask, set extent, and get pixel size
-template = 'E:/r_wd/distcaco3.tif'
+template = arcpy.GetParameterAsText(3)
 # clipping region shapefile (for initial data processing subset)
-clip = 'E:/r_wd/sdmVA_pred_area.shp'
+clip = arcpy.GetParameterAsText(4)
 # end set paths
+
+# options
+# focal stats fill type? ('MEAN','MAJORITY','MEDIAN')
+typ = arcpy.GetParameterAsText(5)
+# run recursively (1km fill at a time) or with one focal stats (with minimum necessary radius to fill all nodata)
+recursive = arcpy.GetParameter(6)
+
+if typ:
+   typ = typ
+else:
+   typ = 'MEAN'
 
 # set environmental variables
 arcpy.env.workspace = wd
@@ -62,7 +67,10 @@ desc = arcpy.Describe(template)
 cellsize = desc.children[0].meanCellHeight  
 
 r1 = arcpy.Resample_management(lyr, wd + "r1.tif", str(cellsize), "BILINEAR")
-r2 = arcpy.Clip_management(r1, "#", wd + "r2.tif", clip, "#", "ClippingGeometry")
+if clip:
+   r2 = arcpy.Clip_management(r1, "#", wd + "r2.tif", clip, "#", "ClippingGeometry")
+else:
+   r2 = r1
 
 if not recursive:
    # check out Spatial Analyst for EucDistance
