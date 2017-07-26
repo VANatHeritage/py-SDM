@@ -212,19 +212,19 @@ for raster in proj_source:
     print "Calculating neighborhood 1 cell square"
     outFocal_1=FocalStatistics(raster,neighborhood_1,"MEAN","DATA")
     outFocal_1=Con(IsNull(outFocal_1),0, outFocal_1)
-    outFocal_1=ExtractByMask(outFocal_1,"maskfinal")
+    outFocal_1=ExtractByMask(outFocal_1,mask)
     outFocal_1.save(out_raster_1)
     print "Finished with first neighborhood"
     print "Calculating neighborhood 10 cell circle"
     outFocal_10=FocalStatistics(raster,neighborhood_10,"MEAN","DATA")
     outFocal_10=Con(IsNull(outFocal_10),0, outFocal_10)
-    outFocal_10=ExtractByMask(outFocal_10,"maskfinal")
+    outFocal_10=ExtractByMask(outFocal_10,mask)
     outFocal_10.save(out_raster_10)
     print "Finished with second neighborhood"
     print "Calculating neighborhood 100 cell circle"
     outFocal_100=FocalStatistics(raster,neighborhood_100,"MEAN","DATA")
     outFocal_100=Con(IsNull(outFocal_100),0, outFocal_100)
-    outFocal_100=ExtractByMask(outFocal_100,"maskfinal")
+    outFocal_100=ExtractByMask(outFocal_100,mask)
     outFocal_100.save(out_raster_100)
     print "Finished with "+basename
     
