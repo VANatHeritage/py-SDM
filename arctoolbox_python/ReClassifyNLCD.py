@@ -61,6 +61,17 @@ arcpy.CheckOutExtension("Spatial")
 arcpy.env.workspace = out_gdb
 arcpy.env.overwriteOutput=True
 
+# extent shp default
+if not extent_shp:
+   arcpy.CheckOutExtension("3d")
+   if mask:
+      extent_shp = arcpy.RasterDomain_3d(mask, "nlcdprocextent", "POLYGON")
+   else:
+      extent_shp = arcpy.RasterDomain_3d(nlcd_classified, "nlcdprocextent", "POLYGON")
+else: 
+   # buffer extent feature
+   extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="nlcdprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
+
 # mask default
 if mask:
    arcpy.AddMessage("Using specified mask")
@@ -70,9 +81,6 @@ else:
    mask.save("maskfinal")
 
 arcpy.env.snapRaster = mask
-
-# buffer extent feature
-extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="nlcdprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
 
 # clean (clip and set null) rasters
 # nlcd classified
