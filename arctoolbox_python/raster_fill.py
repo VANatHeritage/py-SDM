@@ -25,6 +25,8 @@ import numpy as np
 import numpy.ma as ma
 from arcpy import env
 from arcpy.sa import *
+# check out Spatial Analyst for EucDistance
+arcpy.CheckOutExtension("Spatial")
 
 # set paths
 # output file
@@ -73,9 +75,6 @@ else:
    r2 = r1
 
 if not recursive:
-   # check out Spatial Analyst for EucDistance
-   arcpy.CheckOutExtension("Spatial")
-
    # retrieve maximum distance of nodata value to real values
    # for conditionally filling nodata values with mean of circular neighborhood (with radius mx)
    ed1 = EucDistance(r2)
@@ -92,9 +91,10 @@ if not recursive:
    r3.save(out_file)
 
 else:
-   # this loop recursively fills nodata cells within 1km until the number of nodata cells matches the template dataset
+   # this loop recursively fills nodata cells within 1km (adding 1km each iteration) until the number of nodata cells matches the template dataset
+   rad = 0
    while ndfinal != ndtempl:
-      r2 = Con(IsNull(r2),FocalStatistics(r2, NbrCircle(1000, 'MAP'),typ), r2)
+      r2 = Con(IsNull(r2),FocalStatistics(r2, NbrCircle(rad + 1000, 'MAP'),typ), r2)
       r2 = ExtractByMask(r2, template)
       npArray = arcpy.RasterToNumPyArray(r2,"","","",-9999)
       ndfinal = len(ma.masked_where(npArray <> -9999, npArray).compressed())

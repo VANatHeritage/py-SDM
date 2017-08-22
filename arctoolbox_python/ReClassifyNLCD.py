@@ -2,7 +2,7 @@
 # nlcd_summaries.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016
-# Last Edit: 2017-07-25
+# Last Edit: 2017-08-21
 # Creator(s): Amy Conley, David Bucklin
 
 # Summary:
@@ -11,6 +11,13 @@
 # summary variables for land cover types, using 
 # neighborhood analysis, in a 3x3 window, 10-cell circle,
 # and 100-cell circle around the focal cell
+
+# Also reclassifies NLCD 1992. The reclassifications for 1992 accept
+# a raster that has a mix of 1992 and 2001 classifications (they are different).
+# To create a raster with this mixed classification, you can use the 1992-2001 
+# change product to identify cells that changed  between the two dates, 
+# and then create a new land cover raster that merges the two based on whether
+# the given pixel changed classes between those dates.
 
 # Usage Tips:
 # Set all paths prior to usage.
@@ -43,6 +50,9 @@ canopy_raster=arcpy.GetParameterAsText(5)
 
 # optional mask
 mask = arcpy.GetParameterAsText(6)
+
+# for 92 reclass
+nlcd92 = arcpy.GetParameterAsText(7)
 
 # end variables
 
@@ -92,48 +102,116 @@ if canopy_raster:
 
 ##Step 0: Set up the Remap Values
 
-#Raster values and their associated habitat in the NLCD
-#11= Open Water
-#12= Perennial Ice/Snow
-#21= Developed Open Space
-#22= Developed Low Intensity
-#23= Developed Medium Intensity
-#24=Developed High Intensity
-#31 = Barren Land
-#41 = Deciduous Forest
-#42 = Evergreen Forest
-#43 = Mixed Forest
-#52=Shrub/Scrub
-#71=Grassland/Herbaceous
-#81=Pasture/Hay
-#82=Cultivated Crops
-#90= Woody Wetlands
-#95= Emergent Herbaceous Wetlands
+if nlcd92:
+   ## 1992 values
 
+   #Raster values and their associated habitat in the NLCD
+   #11 = Open Water
+   #12 = Perennial Ice/Snow
+   #21 = Low Intensity Residential
+   #22 = High Intensity Residential
+   #23 = Commercial/Industrial/Transportation
+   #31 = Bare Rock/Sand/Clay
+   #32 = Quarries/Strip Mines/Gravel Pits
+   #33 = Transitional Barren
+   #41 = Deciduous Forest
+   #42 = Evergreen Forest
+   #43 = Mixed Forest
+   #51 = Shrubland
+   #61 = Orchards/Vineyards/Other
+   #71 = Grassland/Herbaceous
+   #81 = Pasture/Hay
+   #82 = Row Crops
+   #83 = Small Grains
+   #84 = Fallow
+   #85 = Urban/Recreational Grasses
+   #91 = Woody Wetlands
+   #92 = Emergent Herbaceous Wetlands
+   
+   # 2001 CLASSES NOT IN 1992 (allows use of raster with a combination of both classification schemes)
+   #24=Developed High Intensity
+   #52=Shrub/Scrub
+   #90= Woody Wetlands
+   #95= Emergent Herbaceous Wetlands
+   # ADDED TO 1992 RECLASSIFY ARRAYS: [24,0],[52,0],[90,0],[95,0]
 
-#For Forest we only want values 41,42,43
-remap_forest=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,1],[42,1],[43,1],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+   #For Forest we only want values 41,42,43 (GOOD for 2001)
+   remap_forest=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,1],[42,1],[43,1],[51,0],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,0],[92,0],
+      [24,0],[52,0],[90,0],[95,0]])
 
-#For Wetland we only want 90 and 95
-remap_wetland=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,0],[43,0],[52,0],[71,0],[81,0],[82,0],[90,1],[95,1]])
+   #For Wetland we only want 91 and 92 (ADDED 90 95 for 2001)
+   remap_wetland=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,0],[42,0],[43,0],[51,0],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,1],[92,1],
+      [24,0],[52,0],[90,1],[95,1]])
 
-#For Open Area we want 31, 71,81,82
-remap_Open=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,1],[41,0],[42,0],[43,0],[52,0],[71,1],[81,1],[82,1],[90,0],[95,0]])
+   #For Open Area we want 31,32,33,61,71,81,82,83,84 (not 85) - all barren, agricultural (including orchard [61]) (GOOD for 2001)
+   remap_Open=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,1],[32,1],[33,1],[41,0],[42,0],[43,0],[51,0],[61,1],[71,1],[81,1],[82,1],[83,1],[84,1],[85,0],[91,0],[92,0],
+      [24,0],[52,0],[90,0],[95,0]])
 
-#For Water we want 11
-remap_water=RemapValue([[11,1],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,0],[43,0],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+   #For Water we want 11 (GOOD FOR 2001)
+   remap_water=RemapValue([[11,1],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,0],[42,0],[43,0],[51,0],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,0],[92,0],
+      [24,0],[52,0],[90,0],[95,0]])
 
-#For ShrubScrub we want 52
-remap_ShrubScrub=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,0],[43,0],[52,1],[71,0],[81,0],[82,0],[90,0],[95,0]])
+   #For ShrubScrub we want 51 (ADDED 52 for 2001)
+   remap_ShrubScrub=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,0],[42,0],[43,0],[51,1],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,0],[92,0],
+      [24,0],[52,1],[90,0],[95,0]])
 
-#For ConiferForest we want 42
-remap_evergreen=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,1],[43,0],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+   #For ConiferForest we want 42 (GOOD FOR 2001)
+   remap_evergreen=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,0],[42,1],[43,0],[51,0],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,0],[92,0],
+      [24,0],[52,0],[90,0],[95,0]])
 
-#For Deciduous/Mix we want 41 and 43 and we want 43 half as much so 41->100 and 43->50
-remap_decidmix=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,100],[42,0],[43,50],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+   #For Deciduous/Mix we want 41 and 43 and we want 43 half as much so 41->100 and 43->50 (GOOD FOR 2001)
+   remap_decidmix=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,100],[42,0],[43,50],[51,0],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,0],[92,0],
+      [24,0],[52,0],[90,0],[95,0]])
 
-#For Evergreen/Mix we want 42 and 43 and we want 43 half as much so 42->100 and 43->50
-remap_evermix=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,100],[43,50],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+   #For Evergreen/Mix we want 42 and 43 and we want 43 half as much so 42->100 and 43->50 (GOOD FOR 2001)
+   remap_evermix=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[31,0],[32,0],[33,0],[41,0],[42,100],[43,50],[51,0],[61,0],[71,0],[81,0],[82,0],[83,0],[84,0],[85,0],[91,0],[92,0],
+      [24,0],[52,0],[90,0],[95,0]])
+
+else:
+
+   ## 2001, 2006, 2011 values
+
+   #Raster values and their associated habitat in the NLCD
+   #11 = Open Water
+   #12 = Perennial Ice/Snow
+   #21 = Developed Open Space
+   #22 = Developed Low Intensity
+   #23 = Developed Medium Intensity
+   #24 = Developed High Intensity
+   #31 = Barren Land
+   #41 = Deciduous Forest
+   #42 = Evergreen Forest
+   #43 = Mixed Forest
+   #52 = Shrub/Scrub
+   #71 = Grassland/Herbaceous
+   #81 = Pasture/Hay
+   #82 = Cultivated Crops
+   #90 = Woody Wetlands
+   #95 = Emergent Herbaceous Wetlands
+
+   #For Forest we only want values 41,42,43
+   remap_forest=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,1],[42,1],[43,1],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+
+   #For Wetland we only want 90 and 95
+   remap_wetland=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,0],[43,0],[52,0],[71,0],[81,0],[82,0],[90,1],[95,1]])
+
+   #For Open Area we want 31, 71,81,82
+   remap_Open=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,1],[41,0],[42,0],[43,0],[52,0],[71,1],[81,1],[82,1],[90,0],[95,0]])
+
+   #For Water we want 11
+   remap_water=RemapValue([[11,1],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,0],[43,0],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+
+   #For ShrubScrub we want 52
+   remap_ShrubScrub=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,0],[43,0],[52,1],[71,0],[81,0],[82,0],[90,0],[95,0]])
+
+   #For ConiferForest we want 42
+   remap_evergreen=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,1],[43,0],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+
+   #For Deciduous/Mix we want 41 and 43 and we want 43 half as much so 41->100 and 43->50
+   remap_decidmix=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,100],[42,0],[43,50],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
+
+   #For Evergreen/Mix we want 42 and 43 and we want 43 half as much so 42->100 and 43->50
+   remap_evermix=RemapValue([[11,0],[12,0],[21,0],[22,0],[23,0],[24,0],[31,0],[41,0],[42,100],[43,50],[52,0],[71,0],[81,0],[82,0],[90,0],[95,0]])
 
 # do reclassifys
 inraster= in_nlcd_class
