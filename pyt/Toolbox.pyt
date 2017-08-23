@@ -175,7 +175,7 @@ class rasterFill(object):
             direction = "Input")
       rad.value = 15
       
-      params = [lyr, wd, template, clip, out_file, typ, recursive]
+      params = [lyr, wd, template, clip, out_file, typ, recursive, rad]
       return params
 
    def isLicensed(self):
@@ -253,8 +253,6 @@ class rasterFill(object):
       r2 = arcpy.Clip_management(r1, "#", "r2", clip, "#", "ClippingGeometry")
       r2_orig = r2
 
-      # con to mask out values for water areas
-
       if not recursive:
          arcpy.AddMessage("Calculating focal statistics radius...")
          # retrieve maximum distance of nodata value to real values
@@ -274,7 +272,7 @@ class rasterFill(object):
          r3.save(out_file)
 
       else:
-         rad = cellsize * 15 # start with 15-cell width fill (15*30 = 450m)
+         rad = cellsize * rad # start with specified width (rad)
          # this loop recursively fills nodata cells, increasing the fill expansion and focal window each iteration
          while ndfinal != ndtempl:
             # determine areas to fill (by 'rad' variable)
@@ -373,7 +371,7 @@ class reclassNLCD(object):
    def isLicensed(self):
       """Check whether tool is licensed to execute."""
       try:
-         if arcpy.CheckExtension("Spatial") != "Available" or arcpy.CheckExtension("3d") != "Available":
+         if arcpy.CheckExtension("Spatial") != "Available":
             raise Exception
       except Exception:
          return False  # tool cannot be executed
