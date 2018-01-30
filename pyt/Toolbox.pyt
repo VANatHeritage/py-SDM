@@ -721,7 +721,7 @@ class reclassCCAP(object):
             direction="Input")
       
       nlcd_classified = arcpy.Parameter(
-            displayName = "NLCD classified (land cover) raster",
+            displayName = "CCAP classified (land cover) raster",
             name="nlcd_classified",
             datatype="DERasterDataset",
             parameterType="Required",
@@ -812,13 +812,13 @@ class reclassCCAP(object):
       if not extent_shp:
          arcpy.CheckOutExtension("3d")
          if mask:
-            extent_shp = arcpy.RasterDomain_3d(mask, "nlcdprocextent", "POLYGON")
+            extent_shp = arcpy.RasterDomain_3d(mask, "ccapprocextent", "POLYGON")
          else:
             arcpy.AddMessage("No mask or extent specified. Processing entire raster...")
-            extent_shp = arcpy.RasterDomain_3d(nlcd_classified, "nlcdprocextent", "POLYGON")
+            extent_shp = arcpy.RasterDomain_3d(nlcd_classified, "ccapprocextent", "POLYGON")
       else: 
          # buffer extent feature
-         extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="nlcdprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
+         extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="ccapprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
 
       # mask default
       if mask:
@@ -832,13 +832,13 @@ class reclassCCAP(object):
 
       # clean (clip and set null) rasters
       # nlcd classified
-      in_nlcd = arcpy.Clip_management(nlcd_classified,"#","nlcd_cliptemp", extent_shp, "#", "ClippingGeometry")
-      inraster= "nlcd_cliptemp"
+      in_nlcd = arcpy.Clip_management(nlcd_classified,"#","ccap_cliptemp", extent_shp, "#", "ClippingGeometry")
+      inraster= "ccap_cliptemp"
       where_clause="Value = 0"
-      output_raster="nlcd_classified_clean"
+      output_raster="ccap_classified_clean"
       outsetNull=SetNull(inraster,inraster,where_clause)
       outsetNull.save(output_raster)
-      in_nlcd_class="nlcd_classified_clean"
+      in_nlcd_class="ccap_classified_clean"
 
       # impervious
       if impervious_raster:
@@ -857,71 +857,71 @@ class reclassCCAP(object):
 
 
       ##Step 0: Set up the Remap Values
-         #Raster values and their associated habitat in CCAP
-         #0 = background
-         #1 = unclassified
-         #2 = Developed High Intensity
-         #3 = Developed Medium Intensity
-         #4 = Developed Low Intensity
-         #5 = Developed Open Space
-         #6 = Cultivated Crops
-         #7 = Pasture/Hay
-         #8 = Grassland/Herbaceous
-         #9 = Deciduous Forest
-         #10 = Evergreen Forest
-         #11 = Mixed Forest
-         #12 = Shrub/Scrub
-         #13 = Palustrine Forested Wetland **DIFFERENT FROM NLCD**
-         #14 = Palustrine Scrub/Shrub wetland **DIFFERENT FROM NLCD**
-         #15 = Palustrine Emergent Wetland (persistent) **DIFFERENT FROM NLCD**
-         #16 = Estuarine Forested Wetland **DIFFERENT FROM NLCD**
-         #17 = Esturaine Scrub/Shrub Wetland **DIFFERENT FROM NLCD**
-         #18 = Estuarine Emergent Wetland **DIFFERENT FROM NLCD**
-         #19 = Unconsolidated shore **DIFFERENT FROM NLCD**
-         
-         # Barren lands
-         #20 = Barren Land
-         #24 = Tundra
-         #25 = Perennial Ice/Snow
-         
-         # Water/submerged lands
-         #21 = Open Water
-         #22 Palustrine Aquatic Bed **DIFFERENT FROM NLCD**
-         #23 Estuarine Aquatic Bed **DIFFERENT FROM NLCD**
-         
-         # template_allzeros([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      #Raster values and their associated habitat in CCAP
+      #0 = background
+      #1 = unclassified
+      #2 = Developed High Intensity
+      #3 = Developed Medium Intensity
+      #4 = Developed Low Intensity
+      #5 = Developed Open Space
+      #6 = Cultivated Crops
+      #7 = Pasture/Hay
+      #8 = Grassland/Herbaceous
+      #9 = Deciduous Forest
+      #10 = Evergreen Forest
+      #11 = Mixed Forest
+      #12 = Shrub/Scrub
+      #13 = Palustrine Forested Wetland **DIFFERENT FROM NLCD**
+      #14 = Palustrine Scrub/Shrub wetland **DIFFERENT FROM NLCD**
+      #15 = Palustrine Emergent Wetland (persistent) **DIFFERENT FROM NLCD**
+      #16 = Estuarine Forested Wetland **DIFFERENT FROM NLCD**
+      #17 = Esturaine Scrub/Shrub Wetland **DIFFERENT FROM NLCD**
+      #18 = Estuarine Emergent Wetland **DIFFERENT FROM NLCD**
+      #19 = Unconsolidated shore **DIFFERENT FROM NLCD**
+      
+      # Barren lands
+      #20 = Barren Land
+      #24 = Tundra
+      #25 = Perennial Ice/Snow
+      
+      # Water/submerged lands
+      #21 = Open Water
+      #22 Palustrine Aquatic Bed **DIFFERENT FROM NLCD**
+      #23 Estuarine Aquatic Bed **DIFFERENT FROM NLCD**
+      
+      # template_allzeros([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
-         #For Forest we only want values 9,10,11
-         remap_forest=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,1],[10,1],[11,1],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      #For Forest we only want values 9,10,11
+      remap_forest=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,1],[10,1],[11,1],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
-         #For Open Area we want 8,7,6
-         remap_Open=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,1],[7,1],[8,1],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      #For Open Area we want 8,7,6
+      remap_Open=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,1],[7,1],[8,1],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
-         #For Water we want 21
-         remap_water=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,1],[22,0],[23,0],[24,0],[25,0]])
+      #For Water we want 21
+      remap_water=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,1],[22,0],[23,0],[24,0],[25,0]])
 
-         #For ShrubScrub we want 12
-         remap_ShrubScrub=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,1],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      #For ShrubScrub we want 12
+      remap_ShrubScrub=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,1],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
-         #For Deciduous/Mix we want 9 and 11 and we want 11 half as much so 9->100 and 11->50
-         remap_decidmix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,100],[10,0],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      #For Deciduous/Mix we want 9 and 11 and we want 11 half as much so 9->100 and 11->50
+      remap_decidmix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,100],[10,0],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
-         #For Evergreen/Mix we want 10 and 11 and we want 11 half as much so 10->100 and 11->50
-         remap_evermix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,100],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      #For Evergreen/Mix we want 10 and 11 and we want 11 half as much so 10->100 and 11->50
+      remap_evermix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,100],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
-         ## CCAP-specific types
-         # unconsolidated shore (19, 20)
-         remap_shore=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,1],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
-         
-         # estuarine woody (16,17)
-         remap_estwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,1],[17,1],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
-         # palustrine woody (13,14)
-         remap_palwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,1],[14,1],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
-         
-         # estuarine veg (18,23))
-         remap_estveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
-         # palustrine veg (15, 22)
-         remap_palveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
+      ## CCAP-specific types
+      # unconsolidated shore (19, 20)
+      remap_shore=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,1],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      
+      # estuarine woody (16,17)
+      remap_estwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,1],[17,1],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      # palustrine woody (13,14)
+      remap_palwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,1],[14,1],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      
+      # estuarine veg (18,23))
+      remap_estveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
+      # palustrine veg (15, 22)
+      remap_palveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
 
       # do reclassifys
       inraster= in_nlcd_class
@@ -948,19 +948,19 @@ class reclassCCAP(object):
       
       ## CCAP-specific types
       out_reclassify_shore=Reclassify(inraster,reclass_field,remap_shore,"NODATA")
-      out_reclassify_wetland.save(project_nm + "_b_shore_n")
+      out_reclassify_shore.save(project_nm + "_b_shore_n")
       
-      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_estwoody,"NODATA")
-      out_reclassify_wetland.save(project_nm + "_b_estwoody_n")
+      out_reclassify_estwoody=Reclassify(inraster,reclass_field,remap_estwoody,"NODATA")
+      out_reclassify_estwoody.save(project_nm + "_b_estwoody_n")
       
-      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_palwoody,"NODATA")
-      out_reclassify_wetland.save(project_nm + "_b_palwoody_n")
+      out_reclassify_palwoody=Reclassify(inraster,reclass_field,remap_palwoody,"NODATA")
+      out_reclassify_palwoody.save(project_nm + "_b_palwoody_n")
       
-      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_estveg,"NODATA")
-      out_reclassify_wetland.save(project_nm + "_b_estveg_n")
+      out_reclassify_estveg=Reclassify(inraster,reclass_field,remap_estveg,"NODATA")
+      out_reclassify_estveg.save(project_nm + "_b_estveg_n")
       
-      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_palveg,"NODATA")
-      out_reclassify_wetland.save(project_nm + "_b_palveg_n")
+      out_reclassify_palveg=Reclassify(inraster,reclass_field,remap_palveg,"NODATA")
+      out_reclassify_palveg.save(project_nm + "_b_palveg_n")
       
       arcpy.AddMessage("Done reclassifying")
       #Step 3: Calculate focal statistics
@@ -1033,7 +1033,7 @@ class reclassCCAP(object):
       ## clean up
       if arcpy.Exists("maskfinal"):
           arcpy.Delete_management("maskfinal")
-      arcpy.Delete_management("nlcdprocextent")
-      arcpy.Delete_management("nlcd_cliptemp")
+      arcpy.Delete_management("ccapprocextent")
+      arcpy.Delete_management("ccap_cliptemp")
 
       return
