@@ -7,7 +7,7 @@ class Toolbox(object):
       self.alias = "envvarproc"
 
       # List of tool classes associated with this toolbox (defined classes below)
-      self.tools = [finalizeEnvVar, rasterFill, reclassNLCD]
+      self.tools = [finalizeEnvVar, rasterFill, reclassNLCD, reclassCCAP]
 
 # finalize environmental variables
 class finalizeEnvVar(object):
@@ -655,6 +655,354 @@ class reclassNLCD(object):
               basename="mean_deciduous_mixed_n"
           elif "evermix" in raster:
               basename="mean_evergreen_mixed_n"
+          else:
+              continue
+          
+          arcpy.AddMessage("Preparing to calculate focal statistics for "+basename + "...")
+
+          out_raster_1=project_nm + "_" + basename+"_1"
+          out_raster_10=project_nm + "_" + basename+"_10"
+          out_raster_100=project_nm + "_" + basename+"_100"
+          print "Calculating neighborhood 1 cell square"
+          outFocal_1=FocalStatistics(raster,neighborhood_1,"MEAN","DATA")
+          outFocal_1=Con(IsNull(outFocal_1),0, outFocal_1)
+          outFocal_1=ExtractByMask(outFocal_1,mask)
+          outFocal_1.save(out_raster_1)
+          print "Finished with first neighborhood"
+          print "Calculating neighborhood 10 cell circle"
+          outFocal_10=FocalStatistics(raster,neighborhood_10,"MEAN","DATA")
+          outFocal_10=Con(IsNull(outFocal_10),0, outFocal_10)
+          outFocal_10=ExtractByMask(outFocal_10,mask)
+          outFocal_10.save(out_raster_10)
+          print "Finished with second neighborhood"
+          print "Calculating neighborhood 100 cell circle"
+          outFocal_100=FocalStatistics(raster,neighborhood_100,"MEAN","DATA")
+          outFocal_100=Con(IsNull(outFocal_100),0, outFocal_100)
+          outFocal_100=ExtractByMask(outFocal_100,mask)
+          outFocal_100.save(out_raster_100)
+          arcpy.AddMessage("Finished with "+basename + ".")
+          
+      ## clean up
+      if arcpy.Exists("maskfinal"):
+          arcpy.Delete_management("maskfinal")
+      arcpy.Delete_management("nlcdprocextent")
+      arcpy.Delete_management("nlcd_cliptemp")
+
+      return
+      
+# reclassify CCAP
+class reclassCCAP(object):
+   def __init__(self):
+      self.label = "Summarize CCAP to continuous rasters"
+      self.description = "Takes CCAP (including optional NLCD impervious surface and canopy coverage) data, a study region, and a raster mask, and outputs summary variables for land cover types, using neighborhood analysis, in a 3x3 window, 10-cell circle, and 100-cell circle around the focal cell"
+      self.canRunInBackground = True
+
+   def getParameterInfo(self):
+      """Define parameter definitions"""
+      out_gdb = arcpy.Parameter(
+            displayName="Output geodatabase",
+            name="out_gdb",
+            datatype="DEWorkspace",
+            parameterType="Required",
+            direction="Input")
+      
+      project_nm = arcpy.Parameter(
+            displayName="Project name (prefix for file outputs)",
+            name="project_nm",
+            datatype="GPString",
+            parameterType="Required",
+            direction="Input")
+      
+      extent_shp = arcpy.Parameter(
+            displayName="Output extent",
+            name="extent_shp",
+            datatype="DEFeatureClass",
+            parameterType="Optional",
+            direction="Input")
+      
+      nlcd_classified = arcpy.Parameter(
+            displayName = "NLCD classified (land cover) raster",
+            name="nlcd_classified",
+            datatype="DERasterDataset",
+            parameterType="Required",
+            direction="Input")
+      
+      impervious_raster = arcpy.Parameter(
+            displayName = "NLCD impervious surface raster",
+            name="impervious_raster",
+            datatype="DERasterDataset",
+            parameterType="Optional",
+            direction="Input")
+      
+      canopy_raster = arcpy.Parameter(
+            displayName = "NLCD canopy coverage raster",
+            name="canopy_raster",
+            datatype="DERasterDataset",
+            parameterType="Optional",
+            direction="Input")
+      
+      mask = arcpy.Parameter(
+            displayName = "Raster mask for outputs",
+            name="mask",
+            datatype="DERasterDataset",
+            parameterType="Optional",
+            direction="Input")
+      
+      params = [out_gdb,project_nm,extent_shp,nlcd_classified,impervious_raster,canopy_raster,mask]
+      return params
+
+   def isLicensed(self):
+      """Check whether tool is licensed to execute."""
+      try:
+         if arcpy.CheckExtension("Spatial") != "Available":
+            raise Exception
+      except Exception:
+         return False  # tool cannot be executed
+
+      return True  # tool can be executed
+
+   def updateParameters(self, params):
+      """Modify the values and properties of parameters before internal
+      validation is performed.  This method is called whenever a parameter
+      has been changed. Example would be updating field list after a feature 
+      class was selected for a parameter."""
+      if not params[2].value and arcpy.CheckExtension("3d") != "Available":
+            params[2].parameterType = "Required"
+            
+      return
+
+   def updateMessages(self, params):
+      """Modify the messages created by internal validation for each tool
+      parameter.  This method is called after internal validation."""
+      return
+
+   def execute(self, params, messages):
+      """The source code of the tool."""
+
+      import arcpy
+      from arcpy.sa import *
+
+      # begin variables
+
+      # output gdb
+      out_gdb = params[0].valueAsText
+
+      # file name prefix for outputs
+      project_nm = params[1].valueAsText
+
+      # study extent 
+      extent_shp = params[2].valueAsText
+
+      # input raster(s)
+      nlcd_classified= params[3].valueAsText
+      impervious_raster= params[4].valueAsText
+      canopy_raster= params[5].valueAsText
+
+      # optional mask
+      mask = params[6].valueAsText
+
+      # end variables
+
+      # set environmental variables
+      arcpy.CheckOutExtension("Spatial")
+      arcpy.env.workspace = out_gdb
+      arcpy.env.overwriteOutput=True
+
+      # extent shp default
+      if not extent_shp:
+         arcpy.CheckOutExtension("3d")
+         if mask:
+            extent_shp = arcpy.RasterDomain_3d(mask, "nlcdprocextent", "POLYGON")
+         else:
+            arcpy.AddMessage("No mask or extent specified. Processing entire raster...")
+            extent_shp = arcpy.RasterDomain_3d(nlcd_classified, "nlcdprocextent", "POLYGON")
+      else: 
+         # buffer extent feature
+         extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="nlcdprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
+
+      # mask default
+      if mask:
+         arcpy.AddMessage("Using specified mask")
+      else:
+         arcpy.Clip_management(nlcd_classified,"#","maskfinal", extent_shp, "#", "ClippingGeometry")
+         mask=SetNull("maskfinal","maskfinal","Value = 0")
+         mask.save("maskfinal")
+
+      arcpy.env.snapRaster = mask
+
+      # clean (clip and set null) rasters
+      # nlcd classified
+      in_nlcd = arcpy.Clip_management(nlcd_classified,"#","nlcd_cliptemp", extent_shp, "#", "ClippingGeometry")
+      inraster= "nlcd_cliptemp"
+      where_clause="Value = 0"
+      output_raster="nlcd_classified_clean"
+      outsetNull=SetNull(inraster,inraster,where_clause)
+      outsetNull.save(output_raster)
+      in_nlcd_class="nlcd_classified_clean"
+
+      # impervious
+      if impervious_raster:
+         output_raster="nlcd_impervious_clean"
+         outsetNull=ExtractByMask(impervious_raster,in_nlcd_class)
+         outsetNull=SetNull(outsetNull,outsetNull,"Value = 127")
+         outsetNull.save(output_raster)
+         in_impervious="nlcd_impervious_clean"
+
+      # canopy
+      if canopy_raster:
+         output_raster="nlcd_canopy_clean"
+         outsetNull=ExtractByMask(canopy_raster,in_nlcd_class)
+         outsetNull.save(output_raster)
+         in_canopy="nlcd_canopy_clean"
+
+
+      ##Step 0: Set up the Remap Values
+         #Raster values and their associated habitat in CCAP
+         #0 = background
+         #1 = unclassified
+         #2 = Developed High Intensity
+         #3 = Developed Medium Intensity
+         #4 = Developed Low Intensity
+         #5 = Developed Open Space
+         #6 = Cultivated Crops
+         #7 = Pasture/Hay
+         #8 = Grassland/Herbaceous
+         #9 = Deciduous Forest
+         #10 = Evergreen Forest
+         #11 = Mixed Forest
+         #12 = Shrub/Scrub
+         #13 = Palustrine Forested Wetland **DIFFERENT FROM NLCD**
+         #14 = Palustrine Scrub/Shrub wetland **DIFFERENT FROM NLCD**
+         #15 = Palustrine Emergent Wetland (persistent) **DIFFERENT FROM NLCD**
+         #16 = Estuarine Forested Wetland **DIFFERENT FROM NLCD**
+         #17 = Esturaine Scrub/Shrub Wetland **DIFFERENT FROM NLCD**
+         #18 = Estuarine Emergent Wetland **DIFFERENT FROM NLCD**
+         #19 = Unconsolidated shore **DIFFERENT FROM NLCD**
+         
+         # Barren lands
+         #20 = Barren Land
+         #24 = Tundra
+         #25 = Perennial Ice/Snow
+         
+         # Water/submerged lands
+         #21 = Open Water
+         #22 Palustrine Aquatic Bed **DIFFERENT FROM NLCD**
+         #23 Estuarine Aquatic Bed **DIFFERENT FROM NLCD**
+         
+         # template_allzeros([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+
+         #For Forest we only want values 9,10,11
+         remap_forest=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,1],[10,1],[11,1],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+
+         #For Open Area we want 8,7,6
+         remap_Open=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,1],[7,1],[8,1],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
+
+         #For Water we want 21
+         remap_water=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,1],[22,0],[23,0],[24,0],[25,0]])
+
+         #For ShrubScrub we want 12
+         remap_ShrubScrub=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,1],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+
+         #For Deciduous/Mix we want 9 and 11 and we want 11 half as much so 9->100 and 11->50
+         remap_decidmix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,100],[10,0],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+
+         #For Evergreen/Mix we want 10 and 11 and we want 11 half as much so 10->100 and 11->50
+         remap_evermix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,100],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+
+         ## CCAP-specific types
+         # unconsolidated shore (19, 20)
+         remap_shore=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,1],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
+         
+         # estuarine woody (16,17)
+         remap_estwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,1],[17,1],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+         # palustrine woody (13,14)
+         remap_palwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,1],[14,1],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+         
+         # estuarine veg (18,23))
+         remap_estveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
+         # palustrine veg (15, 22)
+         remap_palveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
+
+      # do reclassifys
+      inraster= in_nlcd_class
+
+      #Step 2 - Reclass the rasters for each desired land type
+      reclass_field= "Value"
+      out_reclassify_forest=Reclassify(inraster,reclass_field,remap_forest,"NODATA")
+      out_reclassify_forest.save(project_nm + "_b_forest_n")
+
+      out_reclassify_open=Reclassify(inraster,reclass_field,remap_Open,"NODATA")
+      out_reclassify_open.save(project_nm + "_b_open_n")
+
+      out_reclassify_water=Reclassify(inraster,reclass_field,remap_water,"NODATA")
+      out_reclassify_water.save(project_nm + "_b_water_n")
+
+      out_reclassify_ShrubScrub=Reclassify(inraster,reclass_field,remap_ShrubScrub,"NODATA")
+      out_reclassify_ShrubScrub.save(project_nm + "_b_shrubscrub_n")
+
+      out_reclassify_decidmix=Reclassify(inraster,reclass_field,remap_decidmix,"NODATA")
+      out_reclassify_decidmix.save(project_nm + "_b_decidmix_n")
+
+      out_reclassify_Evermix=Reclassify(inraster,reclass_field,remap_evermix,"NODATA")
+      out_reclassify_Evermix.save(project_nm + "_b_evermix_n")
+      
+      ## CCAP-specific types
+      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_shore,"NODATA")
+      out_reclassify_wetland.save(project_nm + "_b_shore_n")
+      
+      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_estwoody,"NODATA")
+      out_reclassify_wetland.save(project_nm + "_b_estwoody_n")
+      
+      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_palwoody,"NODATA")
+      out_reclassify_wetland.save(project_nm + "_b_palwoody_n")
+      
+      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_estveg,"NODATA")
+      out_reclassify_wetland.save(project_nm + "_b_estveg_n")
+      
+      out_reclassify_shore=Reclassify(inraster,reclass_field,remap_palveg,"NODATA")
+      out_reclassify_wetland.save(project_nm + "_b_palveg_n")
+      
+      arcpy.AddMessage("Done reclassifying")
+      #Step 3: Calculate focal statistics
+
+      # get list of binary rasters and add impervious and canopy to it
+      proj_source=arcpy.ListRasters(project_nm  + "_b_*")
+      if impervious_raster:
+         proj_source.append(in_impervious)
+      if canopy_raster:
+         proj_source.append(in_canopy)
+
+      neighborhood_1=NbrRectangle(3,3,"CELL")
+      neighborhood_10=NbrCircle(10,"CELL")
+      neighborhood_100=NbrCircle(100,"CELL")
+
+      for raster in proj_source:
+          if "forest" in raster:
+              basename="mean_forest"
+          elif "open" in raster:
+              basename="mean_open"
+          elif "water" in raster:
+              basename="mean_water"
+          elif "shrubscrub" in raster:
+              basename="mean_shrubscrub"
+          elif "canopy" in raster:
+              basename="mean_canopy_n"
+          elif "impervious" in raster:
+              basename="mean_impervious_n"
+          elif "decidmix" in raster:
+              basename="mean_deciduous_mixed_n"
+          elif "evermix" in raster:
+              basename="mean_evergreen_mixed_n"
+          elif "shore" in raster:
+              basename="mean_shore_n"
+          elif "estwoody" in raster:
+              basename="mean_estwoody_n"
+          elif "palwoody" in raster:
+              basename="mean_palwoody_n"
+          elif "estveg" in raster:
+              basename="mean_estveg_n"
+          elif "palveg" in raster:
+              basename="mean_palveg_n"
           else:
               continue
           
