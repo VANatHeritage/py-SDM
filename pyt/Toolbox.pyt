@@ -597,8 +597,9 @@ class reclassNLCD(object):
 
       #Step 2 - Reclass the rasters for each desired land type
       reclass_field= "Value"
-      out_reclassify_forest=Reclassify(inraster,reclass_field,remap_forest,"NODATA")
-      out_reclassify_forest.save(project_nm + "_b_forest_n")
+      
+      #out_reclassify_forest=Reclassify(inraster,reclass_field,remap_forest,"NODATA")
+      #out_reclassify_forest.save(project_nm + "_b_forest_n")
 
       out_reclassify_wetland=Reclassify(inraster,reclass_field,remap_wetland,"NODATA")
       out_reclassify_wetland.save(project_nm + "_b_wetland_n")
@@ -614,8 +615,8 @@ class reclassNLCD(object):
 
       #########Added 2017 - Split the forest into evergreen/mixed forest and deciduous/mixed forest
 
-      out_reclassify_Evergreen=Reclassify(inraster,reclass_field,remap_evergreen,"NODATA")
-      out_reclassify_Evergreen.save(project_nm + "_b_evergreen_n")
+      #out_reclassify_Evergreen=Reclassify(inraster,reclass_field,remap_evergreen,"NODATA")
+      #out_reclassify_Evergreen.save(project_nm + "_b_evergreen_n")
 
       out_reclassify_decidmix=Reclassify(inraster,reclass_field,remap_decidmix,"NODATA")
       out_reclassify_decidmix.save(project_nm + "_b_decidmix_n")
@@ -940,8 +941,10 @@ class reclassCCAP(object):
       arcpy.AddMessage("Reclassifying...")
       #Step 2 - Reclass the rasters for each desired land type
       reclass_field= "Value"
-      out_reclassify_forest=Reclassify(inraster,reclass_field,remap_forest,"NODATA")
-      out_reclassify_forest.save(project_nm + "_b_forest_n")
+      
+      # excluded
+      #out_reclassify_forest=Reclassify(inraster,reclass_field,remap_forest,"NODATA")
+      #out_reclassify_forest.save(project_nm + "_b_forest_n")
 
       out_reclassify_open=Reclassify(inraster,reclass_field,remap_Open,"NODATA")
       out_reclassify_open.save(project_nm + "_b_open_n")
