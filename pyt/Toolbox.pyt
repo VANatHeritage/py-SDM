@@ -308,15 +308,15 @@ class reclassNLCD(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      out_gdb = arcpy.Parameter(
-            displayName="Output geodatabase",
-            name="out_gdb",
+      out_folder = arcpy.Parameter(
+            displayName="Output folder",
+            name="out_folder",
             datatype="DEWorkspace",
             parameterType="Required",
             direction="Input")
       
       project_nm = arcpy.Parameter(
-            displayName="Project name (prefix for file outputs)",
+            displayName="Project name (prefix for geodatabase/file outputs)",
             name="project_nm",
             datatype="GPString",
             parameterType="Required",
@@ -365,7 +365,7 @@ class reclassNLCD(object):
             direction="Input")
       nlcd92.value = True
       
-      params = [out_gdb,project_nm,extent_shp,nlcd_classified,impervious_raster,canopy_raster,mask,nlcd92]
+      params = [out_folder,project_nm,extent_shp,nlcd_classified,impervious_raster,canopy_raster,mask,nlcd92]
       return params
 
    def isLicensed(self):
@@ -397,12 +397,13 @@ class reclassNLCD(object):
       """The source code of the tool."""
 
       import arcpy
+      import os
       from arcpy.sa import *
 
       # begin variables
 
       # output gdb
-      out_gdb = params[0].valueAsText
+      out_folder = params[0].valueAsText
 
       # file name prefix for outputs
       project_nm = params[1].valueAsText
@@ -422,33 +423,36 @@ class reclassNLCD(object):
       nlcd92 = params[7].value
 
       # end variables
+      # create new GDB
+      arcpy.CreateFileGDB_management(out_folder, project_nm + ".gdb")
 
       # set environmental variables
       arcpy.CheckOutExtension("Spatial")
-      arcpy.env.workspace = out_gdb
+      arcpy.env.workspace = out_folder + os.sep + project_nm + ".gdb"
       arcpy.env.overwriteOutput=True
 
-      # extent shp default
-      if not extent_shp:
-         arcpy.CheckOutExtension("3d")
-         if mask:
-            extent_shp = arcpy.RasterDomain_3d(mask, "nlcdprocextent", "POLYGON")
-         else:
-            arcpy.AddMessage("No mask or extent specified. Processing entire raster...")
-            extent_shp = arcpy.RasterDomain_3d(nlcd_classified, "nlcdprocextent", "POLYGON")
-      else: 
-         # buffer extent feature
-         extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="nlcdprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
-
-      # mask default
-      if mask:
-         arcpy.AddMessage("Using specified mask")
+      if extent_shp:
+         extent_shp = arcpy.Buffer_analysis(extent_shp, "nlcdprocextent1", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
       else:
-         arcpy.Clip_management(nlcd_classified,"#","maskfinal", extent_shp, "#", "ClippingGeometry")
-         mask=SetNull("maskfinal","maskfinal","Value = 0")
-         mask.save("maskfinal")
+         e1 = SetNull(nlcd_classified,nlcd_classified,"Value = 0")
+         extent_shp = arcpy.RasterDomain_3d(e1, "nlcdprocextent1", "POLYGON")
+         
+      if mask: 
+         maskshp = arcpy.RasterDomain_3d(mask, "nlcdprocextentmsk", "POLYGON")
+         maskshp = arcpy.Buffer_analysis(maskshp, "nlcdprocextent2", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
+         arcpy.Delete_management("nlcdprocextentmsk")
+      else:
+         mask = SetNull(nlcd_classified,nlcd_classified,"Value = 0")
+         maskshp = arcpy.RasterDomain_3d(mask, "nlcdprocextent2", "POLYGON")
+         maskshp = arcpy.Buffer_analysis(maskshp, "nlcdprocextent2", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
 
-      arcpy.env.snapRaster = mask
+      extent_shp = arcpy.Intersect_analysis(["nlcdprocextent1", "nlcdprocextent2"], "nlcdprocextent")
+      arcpy.Delete_management("nlcdprocextent1")
+      arcpy.Delete_management("nlcdprocextent2")
+      
+      mask = arcpy.Clip_management(mask,"#","maskfinal", extent_shp, "#", "ClippingGeometry")
+
+      arcpy.env.snapRaster = "maskfinal"
 
       # clean (clip and set null) rasters
       # nlcd classified
@@ -474,7 +478,6 @@ class reclassNLCD(object):
          outsetNull=ExtractByMask(canopy_raster,in_nlcd_class)
          outsetNull.save(output_raster)
          in_canopy="nlcd_canopy_clean"
-
 
       ##Step 0: Set up the Remap Values
 
@@ -699,10 +702,10 @@ class reclassCCAP(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      out_gdb = arcpy.Parameter(
-            displayName="Output geodatabase",
-            name="out_gdb",
-            datatype="DEWorkspace",
+      out_folder = arcpy.Parameter(
+            displayName="Output folder",
+            name="out_folder",
+            datatype="DEFolder",
             parameterType="Required",
             direction="Input")
       
@@ -720,9 +723,9 @@ class reclassCCAP(object):
             parameterType="Optional",
             direction="Input")
       
-      nlcd_classified = arcpy.Parameter(
+      ccap_classified = arcpy.Parameter(
             displayName = "CCAP classified (land cover) raster",
-            name="nlcd_classified",
+            name="ccap_classified",
             datatype="DERasterDataset",
             parameterType="Required",
             direction="Input")
@@ -748,7 +751,7 @@ class reclassCCAP(object):
             parameterType="Optional",
             direction="Input")
       
-      params = [out_gdb,project_nm,extent_shp,nlcd_classified,impervious_raster,canopy_raster,mask]
+      params = [out_folder,project_nm,extent_shp,ccap_classified,impervious_raster,canopy_raster,mask]
       return params
 
    def isLicensed(self):
@@ -780,12 +783,13 @@ class reclassCCAP(object):
       """The source code of the tool."""
 
       import arcpy
+      import os
       from arcpy.sa import *
 
       # begin variables
 
       # output gdb
-      out_gdb = params[0].valueAsText
+      out_folder = params[0].valueAsText
 
       # file name prefix for outputs
       project_nm = params[1].valueAsText
@@ -794,7 +798,7 @@ class reclassCCAP(object):
       extent_shp = params[2].valueAsText
 
       # input raster(s)
-      nlcd_classified= params[3].valueAsText
+      ccap_classified= params[3].valueAsText
       impervious_raster= params[4].valueAsText
       canopy_raster= params[5].valueAsText
 
@@ -802,39 +806,44 @@ class reclassCCAP(object):
       mask = params[6].valueAsText
 
       # end variables
+            
+      # create new GDB
+      arcpy.CreateFileGDB_management(out_folder, project_nm + ".gdb")
 
       # set environmental variables
       arcpy.CheckOutExtension("Spatial")
-      arcpy.env.workspace = out_gdb
+      arcpy.env.workspace = out_folder + os.sep + project_nm + ".gdb"
       arcpy.env.overwriteOutput=True
-
-      # extent shp default
-      if not extent_shp:
-         arcpy.CheckOutExtension("3d")
-         if mask:
-            extent_shp = arcpy.RasterDomain_3d(mask, "ccapprocextent", "POLYGON")
-         else:
-            arcpy.AddMessage("No mask or extent specified. Processing entire raster...")
-            extent_shp = arcpy.RasterDomain_3d(nlcd_classified, "ccapprocextent", "POLYGON")
-      else: 
-         # buffer extent feature
-         extent_shp = arcpy.Buffer_analysis(in_features=extent_shp, out_feature_class="ccapprocextent", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
-
-      # mask default
-      if mask:
-         arcpy.AddMessage("Using specified mask")
+      
+      if extent_shp:
+         extent_shp = arcpy.Buffer_analysis(extent_shp, "ccapprocextent1", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
       else:
-         arcpy.Clip_management(nlcd_classified,"#","maskfinal", extent_shp, "#", "ClippingGeometry")
-         mask=SetNull("maskfinal","maskfinal","Value = 0")
-         mask.save("maskfinal")
+         e1 = SetNull(ccap_classified,ccap_classified,"Value = 0")
+         extent_shp = arcpy.RasterDomain_3d(e1, "ccapprocextent1", "POLYGON")
+         
+      if mask: 
+         maskshp = arcpy.RasterDomain_3d(mask, "ccapprocextentmsk", "POLYGON")
+         maskshp = arcpy.Buffer_analysis(maskshp, "ccapprocextent2", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
+         arcpy.Delete_management("ccapprocextentmsk")
+      else:
+         mask = SetNull(ccap_classified,ccap_classified,"Value = 0")
+         maskshp = arcpy.RasterDomain_3d(mask, "ccapprocextent2", "POLYGON")
+         maskshp = arcpy.Buffer_analysis(maskshp, "ccapprocextent2", buffer_distance_or_field="5000 Meters", dissolve_option="ALL")
 
-      arcpy.env.snapRaster = mask
+      extent_shp = arcpy.Intersect_analysis(["ccapprocextent1", "ccapprocextent2"], "ccapprocextent")
+      arcpy.Delete_management("ccapprocextent1")
+      arcpy.Delete_management("ccapprocextent2")
+      
+      mask = arcpy.Clip_management(mask,"#","maskfinal", extent_shp, "#", "ClippingGeometry")
+
+      arcpy.env.snapRaster = "maskfinal"
 
       # clean (clip and set null) rasters
       # nlcd classified
-      in_nlcd = arcpy.Clip_management(nlcd_classified,"#","ccap_cliptemp", extent_shp, "#", "ClippingGeometry")
+      arcpy.AddMessage("Clipping CCAP...")
+      in_nlcd = arcpy.Clip_management(ccap_classified,"#","ccap_cliptemp", extent_shp, "#", "ClippingGeometry")
       inraster= "ccap_cliptemp"
-      where_clause="Value = 0"
+      where_clause="Value = 0 OR Value = 1"  # Value = 1 is unclassified
       output_raster="ccap_classified_clean"
       outsetNull=SetNull(inraster,inraster,where_clause)
       outsetNull.save(output_raster)
@@ -842,6 +851,7 @@ class reclassCCAP(object):
 
       # impervious
       if impervious_raster:
+         arcpy.AddMessage("Clipping impervious raster...")
          output_raster="nlcd_impervious_clean"
          outsetNull=ExtractByMask(impervious_raster,in_nlcd_class)
          outsetNull=SetNull(outsetNull,outsetNull,"Value = 127")
@@ -850,6 +860,7 @@ class reclassCCAP(object):
 
       # canopy
       if canopy_raster:
+         arcpy.AddMessage("Clipping canopy raster...")
          output_raster="nlcd_canopy_clean"
          outsetNull=ExtractByMask(canopy_raster,in_nlcd_class)
          outsetNull.save(output_raster)
@@ -914,18 +925,19 @@ class reclassCCAP(object):
       remap_shore=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,1],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
       
       # estuarine woody (16,17)
-      remap_estwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,1],[17,1],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      remap_estwoody=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,1],[17,1],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
       # palustrine woody (13,14)
-      remap_palwoody=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,1],[14,1],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
+      remap_palwoody=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,1],[14,1],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
       
       # estuarine veg (18,23))
-      remap_estveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
+      remap_estveg=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
       # palustrine veg (15, 22)
-      remap_palveg=([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
+      remap_palveg=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
 
       # do reclassifys
       inraster= in_nlcd_class
-
+      
+      arcpy.AddMessage("Reclassifying...")
       #Step 2 - Reclass the rasters for each desired land type
       reclass_field= "Value"
       out_reclassify_forest=Reclassify(inraster,reclass_field,remap_forest,"NODATA")
