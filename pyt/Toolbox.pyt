@@ -316,7 +316,7 @@ class reclassNLCD(object):
             direction="Input")
       
       project_nm = arcpy.Parameter(
-            displayName="Project name (prefix for geodatabase/file outputs)",
+            displayName="Project name (new geodatabase name/prefix for file outputs)",
             name="project_nm",
             datatype="GPString",
             parameterType="Required",
@@ -662,7 +662,7 @@ class reclassNLCD(object):
           else:
               continue
           
-          arcpy.AddMessage("Preparing to calculate focal statistics for "+basename + "...")
+          arcpy.AddMessage("Calculating focal statistics for "+basename + "...")
 
           out_raster_1=project_nm + "_" + basename+"_1"
           out_raster_10=project_nm + "_" + basename+"_10"
@@ -711,7 +711,7 @@ class reclassCCAP(object):
             direction="Input")
       
       project_nm = arcpy.Parameter(
-            displayName="Project name (prefix for file outputs)",
+            displayName="Project name (new geodatabase name/prefix for file outputs)",
             name="project_nm",
             datatype="GPString",
             parameterType="Required",
@@ -922,7 +922,7 @@ class reclassCCAP(object):
       remap_evermix=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,100],[11,50],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
 
       ## CCAP-specific types
-      # unconsolidated shore (19, 20)
+      # unconsolidated shore/ bare ground (19, 20)
       remap_shore=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,0],[19,1],[20,1],[21,0],[22,0],[23,0],[24,0],[25,0]])
       
       # estuarine woody (16,17)
@@ -930,10 +930,10 @@ class reclassCCAP(object):
       # palustrine woody (13,14)
       remap_palwoody=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,1],[14,1],[15,0],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,0],[23,0],[24,0],[25,0]])
       
-      # estuarine veg (18,23))
-      remap_estveg=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
-      # palustrine veg (15, 22)
-      remap_palveg=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
+      # estuarine herb. veg (18,23))
+      remap_estherb=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,0],[16,0],[17,0],[18,1],[19,0],[20,0],[21,0],[22,0],[23,1],[24,0],[25,0]])
+      # palustrine herb. veg (15, 22)
+      remap_palherb=RemapValue([[0,0],[1,0],[2,0],[3,0],[4,0],[5,0],[6,0],[7,0],[8,0],[9,0],[10,0],[11,0],[12,0],[13,0],[14,0],[15,1],[16,0],[17,0],[18,0],[19,0],[20,0],[21,0],[22,1],[23,0],[24,0],[25,0]])
 
       # do reclassifys
       inraster= in_nlcd_class
@@ -963,7 +963,7 @@ class reclassCCAP(object):
       
       ## CCAP-specific types
       out_reclassify_shore=Reclassify(inraster,reclass_field,remap_shore,"NODATA")
-      out_reclassify_shore.save(project_nm + "_b_shore_n")
+      out_reclassify_shore.save(project_nm + "_b_bareshore_n")
       
       out_reclassify_estwoody=Reclassify(inraster,reclass_field,remap_estwoody,"NODATA")
       out_reclassify_estwoody.save(project_nm + "_b_estwoody_n")
@@ -971,11 +971,11 @@ class reclassCCAP(object):
       out_reclassify_palwoody=Reclassify(inraster,reclass_field,remap_palwoody,"NODATA")
       out_reclassify_palwoody.save(project_nm + "_b_palwoody_n")
       
-      out_reclassify_estveg=Reclassify(inraster,reclass_field,remap_estveg,"NODATA")
-      out_reclassify_estveg.save(project_nm + "_b_estveg_n")
+      out_reclassify_estherb=Reclassify(inraster,reclass_field,remap_estherb,"NODATA")
+      out_reclassify_estherb.save(project_nm + "_b_estherb_n")
       
-      out_reclassify_palveg=Reclassify(inraster,reclass_field,remap_palveg,"NODATA")
-      out_reclassify_palveg.save(project_nm + "_b_palveg_n")
+      out_reclassify_palherb=Reclassify(inraster,reclass_field,remap_palherb,"NODATA")
+      out_reclassify_palherb.save(project_nm + "_b_palherb_n")
       
       arcpy.AddMessage("Done reclassifying")
       #Step 3: Calculate focal statistics
@@ -1008,20 +1008,20 @@ class reclassCCAP(object):
               basename="mean_deciduous_mixed_n"
           elif "evermix" in raster:
               basename="mean_evergreen_mixed_n"
-          elif "shore" in raster:
-              basename="mean_shore_n"
+          elif "bareshore" in raster:
+              basename="mean_bareshore_n"
           elif "estwoody" in raster:
               basename="mean_estwoody_n"
           elif "palwoody" in raster:
               basename="mean_palwoody_n"
-          elif "estveg" in raster:
-              basename="mean_estveg_n"
-          elif "palveg" in raster:
-              basename="mean_palveg_n"
+          elif "estherb" in raster:
+              basename="mean_estherb_n"
+          elif "palherb" in raster:
+              basename="mean_palherb_n"
           else:
               continue
           
-          arcpy.AddMessage("Preparing to calculate focal statistics for "+basename + "...")
+          arcpy.AddMessage("Calculating focal statistics for "+basename + "...")
 
           out_raster_1=project_nm + "_" + basename+"_1"
           out_raster_10=project_nm + "_" + basename+"_10"
