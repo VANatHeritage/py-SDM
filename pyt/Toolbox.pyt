@@ -16,7 +16,8 @@ class finalizeEnvVar(object):
       self.description ="Takes input raster, an optional a raster mask, " + \
                         "and a multiplier. Values are multiplied by the " + \
                         "multiplier and the raster is converted to integer. " + \
-                        "The raster is also masked if a mask is provided."
+                        "The raster is also masked and extended/cropped to " + \
+                        "the mask extent if a mask is provided."
       self.canRunInBackground = True
 
    def getParameterInfo(self):
@@ -78,6 +79,7 @@ class finalizeEnvVar(object):
       """The source code of the tool."""
 
       from arcpy.sa import *
+      from arcpy import env
 
       # in raster
       in_rast = params[0].valueAsText
@@ -94,6 +96,7 @@ class finalizeEnvVar(object):
       mult = int(mult)
 
       if mask:
+         arcpy.env.extent = mask
          arcpy.env.snapRaster = mask
          in_rast = ExtractByMask(in_rast,mask)
 
@@ -399,6 +402,7 @@ class reclassNLCD(object):
       import arcpy
       import os
       from arcpy.sa import *
+      from arcpy import env
 
       # begin variables
 
@@ -786,6 +790,7 @@ class reclassCCAP(object):
       import arcpy
       import os
       from arcpy.sa import *
+      from arcpy import env
 
       # begin variables
 
